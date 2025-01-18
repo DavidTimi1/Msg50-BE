@@ -8,6 +8,7 @@ import uuid
 # Create your models here.
 
 class User(AbstractUser):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     username = models.CharField(max_length=100, unique=True)
     public_key = models.TextField()  # Store the public key here
     profile_data = models.JSONField(default=dict)  # Storing profile settings as JSON
