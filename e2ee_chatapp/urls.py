@@ -26,6 +26,6 @@ urlpatterns = [
 
     path('register', RegisterView.as_view(), name='register'),
     path('login', TokenObtainPairView.as_view(), name='login'),  # For obtaining tokens
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),  # For refreshing tokens
-    path('token/verify/', TokenVerifyView.as_view(), name='token_verify'),  # For verifying tokens
+    path('token/refresh', TokenRefreshView.as_view(), name='token_refresh'),  # For refreshing tokens
+    path('token/verify', TokenVerifyView.as_view(), name='token_verify'),  # For verifying tokens
 ]

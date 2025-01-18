@@ -69,9 +69,9 @@ class UserView(APIView):
 
     def get(self, request, username):
         query = username if username != "me" else request.user.username
-        print(request.user)
-        user = User.objects.get(username=query )
-        return Response({"user data": user})
+        user = User.objects.get(username=query)
+        serializer = self.serializer_class(user)
+        return Response(serializer.data)
 
 
 
