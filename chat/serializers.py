@@ -18,7 +18,7 @@ class UserSerializer(ModelSerializer):
 class MessageSerializer(ModelSerializer):
     class Meta:
         model = Message
-        fields = ["id", "sender", "recipient", "encrypted_message", "timestamp"]
+        fields = ["id", "recipient", "encrypted_message"]
 
 
 class MediaSerializer(ModelSerializer):

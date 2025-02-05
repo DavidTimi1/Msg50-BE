@@ -22,8 +22,6 @@ User = get_user_model()
 
 class MessageViewSet(viewsets.ModelViewSet):
     """CRUD operations for messages."""
-    queryset = Message.objects.all()
-    serializer_class = MessageSerializer
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
@@ -31,9 +29,30 @@ class MessageViewSet(viewsets.ModelViewSet):
         # Show only messages sent to the logged-in user
         return self.queryset.filter(recipient=self.request.user)
 
-    def perform_create(self, serializer):
-        # Automatically set the sender to the logged-in user
-        serializer.save(sender=self.request.user)
+    def post(self, request):
+        data = request.data
+        iv = data.get('iv')
+        encrypted_key = data.get('key')
+        file_id = data.get('file')
+        encrypted_data = data.get('data')
+        
+        # Generate UUID on the backend
+        uuid_value = uuid.uuid4()
+
+        # Create and save the message
+        message = Message.objects.create(
+            uuid=uuid_value,
+            iv=iv,
+            encrypted_key=encrypted_key,
+            file_id=file_id,
+            encrypted_data=encrypted_data,
+            sender=request.user
+        )
+
+        # Serialize the message
+        serializer = MessageSerializer(message)
+
+        return Response(serializer.data, status=201)
 
 
 class MediaUploadView(APIView):
