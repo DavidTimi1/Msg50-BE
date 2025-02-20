@@ -47,12 +47,11 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     
+    "chat",
     "rest_framework",
     "rest_framework_simplejwt",
     "channels",
     "corsheaders",
-
-    "chat",
 ]
 
 
@@ -91,8 +90,7 @@ WSGI_APPLICATION = 'e2ee_chatapp.wsgi.application'
 ASGI_APPLICATION = "e2ee_chatapp.asgi.application"
 CHANNEL_LAYERS = {
     "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {"hosts": [("127.0.0.1", 6379)]},
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
     },
 }
 
