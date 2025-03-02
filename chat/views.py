@@ -1,7 +1,8 @@
+import uuid
 
 # Create your views here.
 from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 
 from django.shortcuts import get_object_or_404, render
 from django.core.files.storage import default_storage
@@ -27,7 +28,7 @@ class MessageViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         # Show only messages sent to the logged-in user
-        return self.queryset.filter(recipient=self.request.user)
+        return self.queryset.filter(receiver_id=self.request.user)
 
     def post(self, request):
         data = request.data
@@ -78,6 +79,14 @@ class UserPublicKeyView(APIView):
     def get(self, request, username):
         user = User.objects.get(username=username)
         return Response({"public_key": user.public_key})
+    
+    def post(self, request):
+        public_key = request.data.get("publicKey")
+
+        if public_key:
+            request.user.public_key = public_key
+            return Response({"success": "Public_key successfully set"})
+
 
 
 class UserView(APIView):

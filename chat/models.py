@@ -33,11 +33,13 @@ class User(AbstractUser):
 
 
 class Message(models.Model):
-    recipient = models.ForeignKey(User, related_name="received_messages", on_delete=models.CASCADE)
-    encrypted_message = models.TextField()
+    msg_id = models.TextField(null=True)
+    receiver_id = models.UUIDField()
+    encrypted_message = models.JSONField()
+    status = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"Message to {self.recipient}"
+        return f"Message to #{self.receiver_id}"
 
 
 class Media(models.Model):
