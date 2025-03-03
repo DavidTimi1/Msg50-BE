@@ -1,9 +1,8 @@
 from .models import Message, Media
-from rest_framework.response import Response
-from rest_framework.serializers import ModelSerializer, CharField
+from rest_framework.serializers import ModelSerializer, CharField, ValidationError
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
 
-from django.contrib.auth.hashers import make_password
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -50,3 +49,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token = super().get_token(user)
         token['uuid'] = str(user.id)
         return token
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        
+        data["socket_token"] = data["access"]  # WebSocket token (same as auth token)
+
+        return data
