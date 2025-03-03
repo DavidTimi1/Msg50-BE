@@ -1,14 +1,19 @@
-from channels.generic.websocket import AsyncWebsocketConsumer
-from .models import Message
 import json
 
+from channels.generic.websocket import AsyncWebsocketConsumer
+from django.contrib.auth import get_user_model
+from channels.db import database_sync_to_async
+
+from .models import Message
+
+
+User = get_user_model()
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        current_user = self.scope["user"]
+        """Authenticate user via WebSocket token."""
+        current_user = self.scope.get("user", None)
         self.user_id = current_user.id
-
-        print(current_user, self.user_id)
 
         if not current_user.is_authenticated:
             print("User is not authenticated")
@@ -22,16 +27,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.accept()
 
         # Check if the user has any queued messages
-        queuedMessages = Message.objects.filter(receiver_id=self.user_id)
-
-        for message in queuedMessages:
-            await self.send(text_data=json.dumps({
-                "action": "new_message",
-                "receiver_id": message.receiver_id,
-                "message": message.encrypted_message,
-            }))
-
-            message.delete() # clear each message after sending
+        self.read_messages(self, self.user_id)
 
 
     async def disconnect(self, close_code):
@@ -102,4 +98,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def is_online(self, user_id):
         # This should check from an actual user online tracking system
         return user_id in [grp.split("_")[-1] for grp in self.channel_layer.groups]
+
+
+    @database_sync_to_async
+    def read_messages(self, user_id):
+        queuedMessages = Message.objects.filter(receiver_id=user_id)
+
+        for message in queuedMessages:
+            self.send(text_data=json.dumps({
+                "action": "new_message",
+                "receiver_id": message.receiver_id,
+                "message": message.encrypted_message,
+            }))
+
+            message.delete() # clear each message after sending
 
