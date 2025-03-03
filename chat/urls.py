@@ -13,5 +13,5 @@ urlpatterns = [
     
     path('api/media/upload/', MediaUploadView.as_view(), name='media-upload'),  # Media upload endpoint
     path('api/user/<str:username>', UserView.as_view(), name='user-details'),  # User details endpoint
-    path('api/user/<str:username>/public-key', UserPublicKeyView.as_view(), name='user-public-key'),  # Public key fetch
+    path('api/user/public-key/', UserPublicKeyView.as_view(), name='user-public-key'),  # Public key fetch
 ]

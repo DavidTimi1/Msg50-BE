@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta name="description" content="Profile page of {{ user.username }} on Message50. Connect and chat securely.">
+    <meta name="keywords" content="Message50, secure chat, {{ user.username }}, profile">
+    <meta name="author" content="{{ user.username }}">
+
+    <meta property="og:title" content="{{ user.username }}'s Profile">
+    <meta property="og:description" content="Profile page of {{ user.username }} on Message50. Connect and chat securely.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://message50-frontend.vercel.app/user/{{ user.username }}">
+    <meta property="og:image" content="URL_TO_PROFILE_IMAGE">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ user.username }}'s Profile | Message50">
+    <meta name="twitter:description" content="Profile page of {{ user.username }} on Message50. Connect and chat securely.">
+    <meta name="twitter:image" content="URL_TO_PROFILE_IMAGE">
+
+    <title>{{ user.username }}'s Profile | Message50 </title>
+</head>
+<body>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .profile-container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: 300px;
+        }
+
+        .profile-container h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .profile-container p {
+            font-size: 16px;
+            margin: 5px 0;
+        }
+
+        .profile-container a {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+
+        .profile-container a:hover {
+            background-color: #0056b3;
+        }
+    </style>
+    
+    <div class="profile-container">
+    <h1>{{ user.username }}'s Profile</h1>
+    <p>Email: {{ user.email }}</p>
+    <p>Bio: {{ user.bio }}</p>
+    <p>Profile Data: {{ user.profile_data }}</p>
+    <!-- link to chat with user -->
+    <a href="https://message50-frontend.vercel.app/user/{{ user.username }}">
+        Chat with {{ user.username }}
+    </a>
+    
+</body>
+</html>

@@ -2,11 +2,10 @@ import uuid
 
 # Create your views here.
 from django.views.decorators.csrf import csrf_exempt
-from django.http import Http404, HttpResponse, JsonResponse
+from django.http import JsonResponse
 
-from django.shortcuts import get_object_or_404, render
-from django.core.files.storage import default_storage
-from rest_framework import viewsets, status, generics
+from django.shortcuts import render
+from rest_framework import viewsets, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -76,30 +75,49 @@ class UserPublicKeyView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, username):
-        user = User.objects.get(username=username)
-        return Response({"public_key": user.public_key})
+    def get(self, request):
+        # get all request queries id as a list
+        user_list = request.GET.getlist('username', [])
+        hash_bucket = {}
+
+        for username in user_list:
+            user = User.objects.get(username=username)
+            hash_bucket[user.id] = user.public_key if user.public_key else None
+
+        return Response(hash_bucket)
     
+
     def post(self, request):
         public_key = request.data.get("publicKey")
-
+        
         if public_key:
+            if request.user.public_key:
+                return Response({"Error": "Would require 2fa for this action to be completed"}, status=400)
+            
             request.user.public_key = public_key
+            request.user.save()
             return Response({"success": "Public_key successfully set"})
+
+
 
 
 
 class UserView(APIView):
     """Fetch the data of a user based on their username."""
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
     serializer_class = UserSerializer
 
     def get(self, request, username):
         query = username if username != "me" else request.user.username
         user = User.objects.get(username=query)
+        
         serializer = self.serializer_class(user)
-        return Response(serializer.data)
+
+        # if user is authenticated show all the data
+        if request.user.is_authenticated:
+            return Response(serializer.data)
+        
+        # if user is not authenticated show only public data in html
+        return render(request, "chat/profile.html", {"user": serializer.data})
 
 
 
