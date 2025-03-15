@@ -1,4 +1,5 @@
 import json
+import string
 
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.contrib.auth import get_user_model
@@ -27,7 +28,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.accept()
 
         # Check if the user has any queued messages
-        self.read_messages(self, self.user_id)
+        await self.read_messages(self.user_id)
 
 
     async def disconnect(self, close_code):
@@ -37,28 +38,27 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     
     async def receive(self, text_data):
-        data = json.loads(text_data)
-        action = data.get("action")
-        receiver_id = data.get("receiver_id")
-        message_id = data.get("message_id")
-        encrypted_data = data.get("encrypted_data")
-        
-        print(data)
+        json_payload: dict = json.loads(text_data)
+        action: string = json_payload.get("action")
+        receiver_id: string = json_payload.get("receiverID")
+        id: string = json_payload.get("id")
+        encrypted_data: string = json_payload.get("data")
         
         message = {
-            "action": "new_message",
             "encrypted_data": encrypted_data,
-            "id": message_id
+            "id": id
         }
 
-        if action == "send_message":
+        if action == "new-message":
             await self.send_message(receiver_id, message)
 
-        elif action == "status_change":
+        elif action == "status-change":
             await self.send_status(receiver_id, message)
 
 
     async def send_message(self, receiver_id, message):
+        print("Sending messsage to", receiver_id)
+
         if await self.is_online(receiver_id):
             await self.channel_layer.group_send(
                 f"chat_{receiver_id}",
@@ -66,7 +66,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
 
         else:
-            Message.objects.create(
+            print(receiver_id, "is not online, saving to database ...")
+            await self.store_message(
                 msg_id=message["id"],
                 receiver_id=receiver_id,
                 encrypted_message=message["encrypted_data"]
@@ -83,7 +84,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
 
         else:
-            Message.objects.create(
+            await self.store_message(
                 msg_id=message["id"],
                 receiver_id=receiver_id,
                 encrypted_message=message["encrypted_data"],
@@ -100,16 +101,42 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return user_id in [grp.split("_")[-1] for grp in self.channel_layer.groups]
 
 
+    async def read_messages(self, user_id):
+        queued_messages = await self.get_queued_messages(user_id)
+
+        for message in queued_messages:
+            print("A message for you!!")
+
+            await self.send(text_data=json.dumps(message))
+            await self.delete_message(message.id)
+
+
     @database_sync_to_async
-    def read_messages(self, user_id):
-        queuedMessages = Message.objects.filter(receiver_id=user_id)
+    def get_queued_messages(self, user_id):
+        queued_messages = Message.objects.filter(receiver_id=user_id)
 
-        for message in queuedMessages:
-            self.send(text_data=json.dumps({
-                "action": "new_message",
-                "receiver_id": message.receiver_id,
+        return [
+            {
+                "action": "new-message",
+                "id": message.msg_id,
+                "receiver_id": str(message.receiver_id),
                 "message": message.encrypted_message,
-            }))
 
-            message.delete() # clear each message after sending
+            } for message in queued_messages
+        ]
+
+
+    @database_sync_to_async
+    def delete_message(self, msg_id):
+        try:
+            msg = Message.objects.get(msg_id=msg_id)
+            msg.delete()
+
+        except:
+            print("Did not find message")
+
+
+    @database_sync_to_async
+    def store_message(self, **params):
+        Message.objects.create(**params)
 

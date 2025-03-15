@@ -13,8 +13,8 @@ class User(AbstractUser):
     public_key = models.TextField()  # Store the public key here
     profile_data = models.JSONField(default=dict)  # Storing profile settings as JSON
 
-    # Add custom fields if needed
     bio = models.TextField(blank=True, null=True)
+    dp = models.TextField(blank=True, null=True) # url to user's profile pic
 
     # Resolve reverse accessor conflicts
     groups = models.ManyToManyField(

@@ -4,7 +4,7 @@ import uuid
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from rest_framework import viewsets, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -81,8 +81,15 @@ class UserPublicKeyView(APIView):
         hash_bucket = {}
 
         for username in user_list:
-            user = User.objects.get(username=username)
-            hash_bucket[user.id] = user.public_key if user.public_key else None
+            try:
+                user = User.objects.get(username=username)
+                user_id = str(user.id)
+
+            except:
+                # user existeth not
+                pass
+            else:
+                hash_bucket[user_id] = user.public_key if user.public_key else None
 
         return Response(hash_bucket)
     
@@ -108,7 +115,7 @@ class UserView(APIView):
 
     def get(self, request, username):
         query = username if username != "me" else request.user.username
-        user = User.objects.get(username=query)
+        user = get_object_or_404(User, username=query)
         
         serializer = self.serializer_class(user)
 
