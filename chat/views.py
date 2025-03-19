@@ -98,8 +98,8 @@ class UserPublicKeyView(APIView):
         public_key = request.data.get("publicKey")
         
         if public_key:
-            if request.user.public_key:
-                return Response({"Error": "Would require 2fa for this action to be completed"}, status=400)
+            # if request.user.public_key:
+                # return Response({"Error": "Would require 2fa for this action to be completed"}, status=400)
             
             request.user.public_key = public_key
             request.user.save()

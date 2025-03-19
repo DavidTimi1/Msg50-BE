@@ -1,3 +1,4 @@
+from email import message
 import json
 import string
 
@@ -45,7 +46,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         encrypted_data: string = json_payload.get("data")
         
         message = {
-            "encrypted_data": encrypted_data,
+            "data": encrypted_data,
             "id": id
         }
 
@@ -56,7 +57,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.send_status(receiver_id, message)
 
 
-    async def send_message(self, receiver_id, message):
+    async def send_message(self, receiver_id, message, saved = False):
         print("Sending messsage to", receiver_id)
 
         if await self.is_online(receiver_id):
@@ -65,16 +66,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 {"type": "chat.message", "message": message}
             )
 
-        else:
+        elif not saved:
             print(receiver_id, "is not online, saving to database ...")
             await self.store_message(
                 msg_id=message["id"],
                 receiver_id=receiver_id,
-                encrypted_message=message["encrypted_data"]
+                encrypted_message=message["data"]
             )
 
 
-    async def send_status(self, receiver_id, message):
+    async def send_status(self, receiver_id, message, saved = False):
         status_message = {"action": "status", "message_id": message["id"]}
 
         if await self.is_online(receiver_id):
@@ -83,11 +84,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 {"type": "chat.status", "message": status_message}
             )
 
-        else:
+        elif not saved:
             await self.store_message(
                 msg_id=message["id"],
                 receiver_id=receiver_id,
-                encrypted_message=message["encrypted_data"],
+                encrypted_message=message["data"],
                 status=True
             )
 
@@ -104,11 +105,19 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def read_messages(self, user_id):
         queued_messages = await self.get_queued_messages(user_id)
 
-        for message in queued_messages:
+        for msg in queued_messages:
             print("A message for you!!")
 
-            await self.send(text_data=json.dumps(message))
-            await self.delete_message(message.id)
+            action, message = msg
+
+
+            if action == "new-message":
+                await self.send_message(user_id, message, True)
+
+            elif action == "status-change":
+                await self.send_status(user_id, message, True)
+
+            await self.delete_message(message["id"], user_id)
 
 
     @database_sync_to_async
@@ -116,27 +125,25 @@ class ChatConsumer(AsyncWebsocketConsumer):
         queued_messages = Message.objects.filter(receiver_id=user_id)
 
         return [
-            {
-                "action": "new-message",
-                "id": message.msg_id,
-                "receiver_id": str(message.receiver_id),
-                "message": message.encrypted_message,
-
-            } for message in queued_messages
+            ( "status-change" if message.status else "new-message", {
+                "data": message.encrypted_message,
+                "id": message.msg_id
+            })
+            for message in queued_messages
         ]
 
 
     @database_sync_to_async
-    def delete_message(self, msg_id):
+    def delete_message(self, msg_id, rec_id):
         try:
-            msg = Message.objects.get(msg_id=msg_id)
+            msg = Message.objects.get(msg_id=msg_id, receiver_id=rec_id)
             msg.delete()
+            print("deleted", msg)
 
-        except:
-            print("Did not find message")
+        except Exception as err:
+            print(err)
 
 
     @database_sync_to_async
     def store_message(self, **params):
         Message.objects.create(**params)
-
