@@ -28,13 +28,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()
 
-        # Check if the user has any queued messages
-        await self.read_messages(self.user_id)
-
 
     async def disconnect(self, close_code):
         if self.scope["user"].is_authenticated:
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
+        
         print("Closing connection", close_code)
 
     
@@ -44,6 +42,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
         receiver_id: string = json_payload.get("receiverID")
         id: string = json_payload.get("id")
         encrypted_data: string = json_payload.get("data")
+
+        if action == "ready":
+            # Check if the user has any queued messages
+            await self.read_messages(self.user_id)
+            return
         
         message = {
             "data": encrypted_data,
@@ -51,20 +54,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
         }
 
         if action == "new-message":
-            await self.send_message(receiver_id, message)
+            await self.send_message(receiver_id, message, action)
 
         elif action == "status-change":
-            await self.send_status(receiver_id, message)
+            await self.send_status(receiver_id, message, action)
 
 
-    async def send_message(self, receiver_id, message, saved = False):
+    async def send_message(self, receiver_id, message, action, saved = False):
         print("Sending messsage to", receiver_id)
 
         if await self.is_online(receiver_id):
             await self.channel_layer.group_send(
                 f"chat_{receiver_id}",
-                {"type": "chat.message", "message": message}
+                {"type": "chat.message", "message": {"type": action, "data": message}}
             )
+            return True
 
         elif not saved:
             print(receiver_id, "is not online, saving to database ...")
@@ -73,6 +77,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 receiver_id=receiver_id,
                 encrypted_message=message["data"]
             )
+            
+        return False
 
 
     async def send_status(self, receiver_id, message, saved = False):
@@ -83,6 +89,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 f"chat_{receiver_id}",
                 {"type": "chat.status", "message": status_message}
             )
+            return True
 
         elif not saved:
             await self.store_message(
@@ -91,6 +98,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 encrypted_message=message["data"],
                 status=True
             )
+
+        return False
 
 
     async def chat_message(self, event):
@@ -109,15 +118,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
             print("A message for you!!")
 
             action, message = msg
-
+            sent = False
 
             if action == "new-message":
-                await self.send_message(user_id, message, True)
+                sent = await self.send_message(user_id, message, action, True)
 
             elif action == "status-change":
-                await self.send_status(user_id, message, True)
+                sent = await self.send_status(user_id, message, True)
 
-            await self.delete_message(message["id"], user_id)
+            sent and await self.delete_message(message["id"], user_id)
 
 
     @database_sync_to_async

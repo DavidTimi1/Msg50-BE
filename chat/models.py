@@ -38,6 +38,8 @@ class Message(models.Model):
     encrypted_message = models.JSONField()
     status = models.BooleanField(default=False)
 
+    # status can be [ "s"-sent, "d"-delivered, "r"-read, "x"- deleted ]
+
     def __str__(self):
         return f"Message to #{self.receiver_id}"
 
