@@ -45,10 +45,11 @@ class Message(models.Model):
 
 
 class Media(models.Model):
-    file = models.FileField(upload_to="encrypted_media/")
+    filePath = models.TextField()
     metadata = models.JSONField(default=dict)  # Metadata for media files
     access_ids = models.ManyToManyField(User, related_name="media_access")
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    
 
     def __str__(self):
         return f"Media {self.uuid}"

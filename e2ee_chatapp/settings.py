@@ -160,7 +160,7 @@ STATIC_URL = 'static/'
 
 # Media files for encrypted uploads
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = BASE_DIR / "encrypted_media"
 
 APPEND_SLASH=False
 

@@ -162,3 +162,6 @@ cython_debug/
 #.idea/
 
 .vscode/
+
+encrypted_media
+!encrypted_media/.nomedia

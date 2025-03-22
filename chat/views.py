@@ -1,8 +1,12 @@
+import json
+import os
+import random
+from string import ascii_lowercase
 import uuid
 
 # Create your views here.
 from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse
+from django.http import FileResponse, JsonResponse
 
 from django.shortcuts import get_object_or_404, render
 from rest_framework import viewsets, generics
@@ -10,6 +14,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
+
+from e2ee_chatapp.settings import MEDIA_ROOT
 
 from .serializers import UserSerializer, MessageSerializer, MediaSerializer, RegisterSerializer
 from .models import Message, Media
@@ -55,19 +61,53 @@ class MessageViewSet(viewsets.ModelViewSet):
         return Response(serializer.data, status=201)
 
 
-class MediaUploadView(APIView):
-    """Upload encrypted media files."""
+class MediaAccessView(APIView):
+    """Access uploaded media files."""
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
+    def get(self, request, uuid):
+        media = get_object_or_404(Media, uuid=uuid)
+
+        # Check if the user has access to the media file
+        if request.user.username not in media.access_ids.values_list('username', flat=True):
+            return Response({"error": "You do not have permission to access this file."}, status=403)
+
+        # Serve the file
+        with open(media.filePath, "rb") as source:
+            response = FileResponse(source.read(), content_type='application/octet-stream')
+            response['Content-Disposition'] = f'attachment; filename=".{media.metadata.get("name")}.bin"'
+            return response
+
+
+class MediaUploadView(APIView):
+    """Upload encrypted media files."""
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]    
+
     def post(self, request):
+
+        file_data = request.FILES.get('file')
+        json_metadata = request.data.get('metadata')
         # Handle file uploads
-        file = request.FILES['file']
-        metadata = request.data.get('metadata', {})
-        media = Media.objects.create(metadata=metadata)
-        media.file.save(file.name, file)
-        media.access_ids.set([request.user.id] + metadata.get("recipients", []))
-        return Response({"uuid": media.uuid})
+        if not (file_data and json_metadata):
+            return Response("No file data specified", 404)
+        
+        file_path = save_to_file(file_data)
+        metadata = json.loads(json_metadata)
+        allowed = [request.user.id]
+
+        for recipeint in metadata:
+            try:
+                allowed.append(User.objects.get(username=recipeint))
+            except:
+                continue
+
+        media = Media.objects.create(metadata=metadata, filePath=file_path)
+
+        media.access_ids.set(allowed)
+        print({"src": media.uuid})
+        return Response({"src": media.uuid})
 
 
 class UserPublicKeyView(APIView):
@@ -138,3 +178,21 @@ def index(request, methods=['GET', 'POST']):
     # send the cookies sent by frontend as json
     cookies = request.COOKIES
     return JsonResponse(cookies)
+
+
+def random_name(length=10):
+    choices = [ random.choice(ascii_lowercase) for _ in range(length) ]
+    return ''.join(choices)
+
+
+def save_to_file(data):
+    file_path = MEDIA_ROOT / f"{random_name()}.bin"
+
+    while os.path.exists(file_path):
+        file_path = MEDIA_ROOT / f"{random_name()}.bin"
+
+    with open(file_path, 'wb') as destination:
+        for chunk in data.chunks():
+            destination.write(chunk)
+    
+    return file_path

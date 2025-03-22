@@ -45,6 +45,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         if action == "ready":
             # Check if the user has any queued messages
+            print("ready to receive messages!")
             await self.read_messages(self.user_id)
             return
         
