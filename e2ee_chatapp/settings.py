@@ -25,19 +25,18 @@ SECRET_KEY = 'django-insecure-e26u0t$r-pvk!^mieigd!)9a)edm_)^nhypu(cl3asf#@_ip5$
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "True") == "True"
+HOST_URL = "http://localhost:8000" if DEBUG else ( os.environ.get("RENDER_EXTERNAL_HOSTNAME") or os.environ.get("HOST_URL") )
+FRONTEND_URL = "http://localhost:3000" if DEBUG else os.environ.get("FRONTEND_URL")
 
 # Optional: If you want to allow only specific origins
 CORS_ALLOWED_ORIGINS = [
+    HOST_URL, # Allow host domain
     os.environ.get("FRONTEND_URL", "http://localhost:3000"),  # Allow this domain
-    os.environ.get("HOST_URL", "http://localhost:8000"),  # Allow host domain
-    "https://message50-frontend.vercel.app",  # Allow this subdomain
-    "http://localhost:3000",  # You can add multiple subdomains
-    "http://localhost:5173",  # You can add multiple subdomains
+    "http://localhost:5173" if DEBUG == True else None,  # You can add multiple subdomains
 ]
 
 # Allow credentials (cookies, Authorization headers, etc.)
 CORS_ALLOW_CREDENTIALS = True
-
 
 
 # Application definition

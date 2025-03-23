@@ -1,6 +1,7 @@
 import json
 import os
 import random
+import re
 from string import ascii_lowercase
 import uuid
 
@@ -17,7 +18,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from e2ee_chatapp.settings import MEDIA_ROOT
 
-from .serializers import UserSerializer, MessageSerializer, MediaSerializer, RegisterSerializer
+from .serializers import UserSerializer, MessageSerializer, RegisterSerializer
 from .models import Message, Media
 
 
@@ -70,14 +71,17 @@ class MediaAccessView(APIView):
         media = get_object_or_404(Media, uuid=uuid)
 
         # Check if the user has access to the media file
-        if request.user.username not in media.access_ids.values_list('username', flat=True):
+        if request.user.id not in media.access_ids.values_list('id', flat=True):
             return Response({"error": "You do not have permission to access this file."}, status=403)
+        
+        if request.GET.get("metadata") is not None:
+            # send metadata without recipients property
+            return JsonResponse({k: v for k, v in media.metadata.items() if k != "recipients"})
 
         # Serve the file
-        with open(media.filePath, "rb") as source:
-            response = FileResponse(source.read(), content_type='application/octet-stream')
-            response['Content-Disposition'] = f'attachment; filename=".{media.metadata.get("name")}.bin"'
-            return response
+        response = FileResponse(open(media.filePath, "rb"), content_type='application/octet-stream')
+        response['Content-Disposition'] = f'attachment; filename="{media.metadata.get("name")}.bin"'
+        return response        
 
 
 class MediaUploadView(APIView):
@@ -97,9 +101,9 @@ class MediaUploadView(APIView):
         metadata = json.loads(json_metadata)
         allowed = [request.user.id]
 
-        for recipeint in metadata:
+        for recipient in metadata["recipients"]:
             try:
-                allowed.append(User.objects.get(username=recipeint))
+                allowed.append(User.objects.get(username=recipient))
             except:
                 continue
 
