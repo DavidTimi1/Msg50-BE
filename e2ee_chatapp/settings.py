@@ -28,6 +28,8 @@ DEBUG = os.environ.get("DEBUG", "True") == "True"
 HOST_URL = "http://localhost:8000" if DEBUG else ( os.environ.get("RENDER_EXTERNAL_HOSTNAME") or os.environ.get("HOST_URL") )
 FRONTEND_URL = "http://localhost:3000" if DEBUG else os.environ.get("FRONTEND_URL")
 
+print(HOST_URL, FRONTEND_URL, DEBUG)
+
 # Optional: If you want to allow only specific origins
 CORS_ALLOWED_ORIGINS = [
     HOST_URL, # Allow host domain
