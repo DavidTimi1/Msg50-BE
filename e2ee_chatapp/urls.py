@@ -19,12 +19,14 @@ from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
 from chat.views import RegisterView
 from chat.serializers import CustomTokenObtainPairSerializer
+from .view import health_check
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
 
 urlpatterns = [
+    path('healthz', health_check, name='health_check'),
     path('admin/', admin.site.urls),
 
     path('chat/', include("chat.urls")),
