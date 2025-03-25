@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-e26u0t$r-pvk!^mieigd!)9a)edm_)^nhypu(cl3asf#@_ip5$
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "True") == "True"
-HOST_URL = "http://localhost:8000" if DEBUG else ( os.environ.get("RENDER_EXTERNAL_HOSTNAME") or os.environ.get("HOST_URL") )
+HOST_URL = "http://localhost:8000" if DEBUG else ( os.environ.get("RENDER_EXTERNAL_URL") or os.environ.get("HOST_URL") )
 FRONTEND_URL = "http://localhost:3000" if DEBUG else os.environ.get("FRONTEND_URL")
 
 print(HOST_URL, FRONTEND_URL, DEBUG)
