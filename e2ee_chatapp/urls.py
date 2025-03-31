@@ -28,6 +28,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 urlpatterns = [
     path('healthz', health_check, name='health_check'),
     path('admin/', admin.site.urls),
+    path('feedback/', include("feedback.urls")),
 
     path('chat/', include("chat.urls")),
 

@@ -110,7 +110,6 @@ class MediaUploadView(APIView):
         media = Media.objects.create(metadata=metadata, filePath=file_path)
 
         media.access_ids.set(allowed)
-        print({"src": media.uuid})
         return Response({"src": media.uuid})
 
 

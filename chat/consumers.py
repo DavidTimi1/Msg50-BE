@@ -62,8 +62,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
 
     async def send_message(self, receiver_id, message, action, saved = False):
-        print("Sending messsage to", receiver_id)
-
         if await self.is_online(receiver_id):
             await self.channel_layer.group_send(
                 f"chat_{receiver_id}",
@@ -72,7 +70,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return True
 
         elif not saved:
-            print(receiver_id, "is not online, saving to database ...")
             await self.store_message(
                 msg_id=message["id"],
                 receiver_id=receiver_id,
@@ -116,8 +113,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
         queued_messages = await self.get_queued_messages(user_id)
 
         for msg in queued_messages:
-            print("A message for you!!")
-
             action, message = msg
             sent = False
 
@@ -148,10 +143,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
         try:
             msg = Message.objects.get(msg_id=msg_id, receiver_id=rec_id)
             msg.delete()
-            print("deleted", msg)
 
         except Exception as err:
-            print(err)
+            print("Failed to delete message", err)
 
 
     @database_sync_to_async
