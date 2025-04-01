@@ -28,10 +28,10 @@ DEBUG = os.environ.get("DEBUG", "True") == "True"
 HOST_URL = "http://localhost:8000" if DEBUG else ( os.environ.get("RENDER_EXTERNAL_URL") or os.environ.get("HOST_URL") )
 FRONTEND_URL = "http://localhost:3000" if DEBUG else os.environ.get("FRONTEND_URL")
 
+ALLOWED_HOSTS = [HOST_URL]
 
 # Optional: If you want to allow only specific origins
 CORS_ALLOWED_ORIGINS = [
-    HOST_URL, # Allow host domain
     os.environ.get("FRONTEND_URL", "http://localhost:3000"),
     "http://localhost:5173" if DEBUG else None,
 ]
@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     
     "chat",
+    "e2ee_chatapp",
     "feedback",
     "rest_framework",
     "rest_framework_simplejwt",
