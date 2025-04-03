@@ -32,8 +32,7 @@ ALLOWED_HOSTS = [HOST_NAME]
 
 # Optional: If you want to allow only specific origins
 CORS_ALLOWED_ORIGINS = [
-    os.environ.get("FRONTEND_URL", "http://localhost:3000"),
-    "http://localhost:5173" if DEBUG else None,
+    os.environ.get("FRONTEND_URL", "http://localhost:3000")
 ]
 
 # Allow credentials (cookies, Authorization headers, etc.)
