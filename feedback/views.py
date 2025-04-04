@@ -9,8 +9,8 @@ from django.conf import settings
 
 
 class FeedbackView(APIView):
-    def post(self, request):
-        serializer = FeedbackSerializer(data=request.data)
+    def post(self, request, project_name):
+        serializer = FeedbackSerializer(data=request.data | {"project_name": project_name.lower() })
 
         if serializer.is_valid():
             serializer.save()
@@ -20,6 +20,9 @@ class FeedbackView(APIView):
 
 
     def get(self, request, project_name=None):
+        if not request.user.is_superuser:
+            return Response({"success": False, "error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+        
         if project_name:
             feedbacks = Feedback.objects.filter(project_name=project_name)
         else:

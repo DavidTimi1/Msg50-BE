@@ -150,8 +150,6 @@ class UserPublicKeyView(APIView):
 
 
 
-
-
 class UserView(APIView):
     """Fetch the data of a user based on their username."""
     serializer_class = UserSerializer
