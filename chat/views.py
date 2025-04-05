@@ -1,13 +1,13 @@
 import json
 import os
 import random
-import re
-from string import ascii_lowercase
+from string import ascii_lowercase, digits
 import uuid
 
 # Create your views here.
 from django.views.decorators.csrf import csrf_exempt
 from django.http import FileResponse, JsonResponse
+from django.contrib.auth import login
 
 from django.shortcuts import get_object_or_404, render
 from rest_framework import viewsets, generics
@@ -15,8 +15,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.tokens import RefreshToken
 
-from e2ee_chatapp.settings import MEDIA_ROOT
+from e2ee_chatapp.settings import ENCRYPTED_MEDIA_ROOT, MEDIA_ROOT
 
 from .serializers import UserSerializer, MessageSerializer, RegisterSerializer
 from .models import Message, Media
@@ -97,7 +98,7 @@ class MediaUploadView(APIView):
         if not (file_data and json_metadata):
             return Response("No file data specified", 404)
         
-        file_path = save_to_file(file_data)
+        file_path = save_to_file(ENCRYPTED_MEDIA_ROOT, file_data, 'bin')
         metadata = json.loads(json_metadata)
         allowed = [request.user.id]
 
@@ -149,7 +150,37 @@ class UserPublicKeyView(APIView):
             return Response({"success": "Public_key successfully set"})
 
 
+class UserProfileEdit(APIView):
+    """Edit a user's display picture (profile picture) and bio."""
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
 
+    def post(self, request):
+        # Get the uploaded file from the request
+        file_data = request.FILES.get('dp')
+        new_bio = request.data.get('bio')
+        file_path = None
+        
+        if file_data:
+            # Validate the file type (optional)
+            ext = file_data.name.split('.')[-1].lower()
+            if ext not in ['jpg', 'jpeg', 'png']:
+                return Response("Invalid file type", status=400)
+
+            file_path = save_to_file(MEDIA_ROOT, file_data, ext)
+
+            # Update the user's profile picture path in the database
+            request.user.dp = file_path
+
+        if new_bio:
+            # Update the user's bio in the database
+            request.user.bio = new_bio
+
+        request.user.save()
+
+        return Response({"success": "Profile has been updated", "new_dp": file_path}, status=200)
+
+    
 class UserView(APIView):
     """Fetch the data of a user based on their username."""
     serializer_class = UserSerializer
@@ -174,6 +205,35 @@ class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
 
+
+class GuestLoginView(APIView):
+    """Allow users to log in as a guest without creating an account."""
+    def post(self, request):
+        # Generate a random username for the guest user
+        random_username = "guest_" + ''.join(random.choices(ascii_lowercase + digits, k=8))
+
+        # Create a temporary user
+        guest_user = User.objects.create_user(
+            username=random_username,
+            password=None  # No password required for guest users
+        )
+        guest_user.is_active = True
+        guest_user.save()
+
+        # Log in the guest user
+        login(request, guest_user)
+
+        # Generate a JWT token for the guest user
+        refresh = RefreshToken.for_user(guest_user)
+        return Response({
+            "message": "Guest login successful",
+            "access_token": str(refresh.access_token),
+            "refresh_token": str(refresh),
+            "username": guest_user.username,
+            "user_id": str(guest_user.id),
+        }, status=200)
+    
+
 @csrf_exempt
 def index(request, methods=['GET', 'POST']):
     # send the cookies sent by frontend as json
@@ -186,11 +246,11 @@ def random_name(length=10):
     return ''.join(choices)
 
 
-def save_to_file(data):
-    file_path = MEDIA_ROOT / f"{random_name()}.bin"
+def save_to_file(root, data, ext):
+    file_path = root / f"{random_name()}.{ext}"
 
     while os.path.exists(file_path):
-        file_path = MEDIA_ROOT / f"{random_name()}.bin"
+        file_path = root / f"{random_name()}.{ext}"
 
     with open(file_path, 'wb') as destination:
         for chunk in data.chunks():

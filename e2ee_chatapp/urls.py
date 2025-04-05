@@ -15,11 +15,12 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
+from django.conf import settings
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
-from chat.views import RegisterView
+from chat.views import RegisterView, GuestLoginView
 from chat.serializers import CustomTokenObtainPairSerializer
-from .view import health_check
+from .view import health_check, ServeMediaFileView
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
@@ -29,6 +30,8 @@ urlpatterns = [
     path('healthz', health_check, name='health_check'),
     path('admin/', admin.site.urls),
     path('feedback/', include("feedback.urls")),
+    
+    path('media/<str:file_name>', ServeMediaFileView.as_view(), name='media_file'),
 
     path('chat/', include("chat.urls")),
 
@@ -36,4 +39,5 @@ urlpatterns = [
     path('login', CustomTokenObtainPairView.as_view(), name='login'),  # For obtaining tokens
     path('token/refresh', TokenRefreshView.as_view(), name='token_refresh'),  # For refreshing tokens
     path('token/verify', TokenVerifyView.as_view(), name='token_verify'),  # For verifying tokens
+    path('guest-login', GuestLoginView.as_view(), name='guest_login'),
 ]
