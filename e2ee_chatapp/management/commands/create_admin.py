@@ -2,9 +2,6 @@
 import os
 from django.contrib.auth import get_user_model
 from django.core.management import BaseCommand
-from dotenv import load_dotenv
-
-load_dotenv()
 
 class Command(BaseCommand):
     help = 'Create a superuser if none exists'
