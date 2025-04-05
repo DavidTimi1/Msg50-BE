@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     
     "chat",
+    "e2ee_chatapp",
     "feedback",
     "rest_framework",
     "rest_framework_simplejwt",
