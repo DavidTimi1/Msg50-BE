@@ -10,12 +10,15 @@ from django.conf import settings
 
 class FeedbackView(APIView):
     def post(self, request, project_name):
-        serializer = FeedbackSerializer(data=request.data | {"project_name": project_name.lower() })
+        # insert project name based on subroute
+        serializer = FeedbackSerializer(data=request.data.dict() | {"project_name": project_name.lower() })
+
 
         if serializer.is_valid():
             serializer.save()
 
             return JsonResponse({"success": "Feedback submitted successfully"}, status=status.HTTP_201_CREATED)
+
         return Response({"success": False, "error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
 
