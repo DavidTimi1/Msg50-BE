@@ -120,15 +120,31 @@ DATABASES = {
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
+        'chat.token_auth.CookieJWTAuthentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=3),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'AUTH_HEADER_TYPES': ('Bearer',),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'TOKEN_COOKIE_NAME': 'access_token',
+    'TOKEN_COOKIE_SECURE': not DEBUG,
+    'TOKEN_COOKIE_HTTPONLY': True,
+    'TOKEN_COOKIE_SAMESITE': 'None',
+    'REFRESH_TOKEN_COOKIE_NAME': 'refresh_token',
+    'REFRESH_TOKEN_COOKIE_SECURE': not DEBUG,
+    'REFRESH_TOKEN_COOKIE_HTTPONLY': True,
+    'REFRESH_TOKEN_COOKIE_SAMESITE': 'None',
 }
+
+# Add CSRF protection for cookies
+CSRF_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'Lax'
 
 
 # Password validation
@@ -165,7 +181,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_URL = '/static/'
 
 # Media files for encrypted uploads
 MEDIA_URL = "/media/"
