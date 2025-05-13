@@ -159,7 +159,6 @@ class CookieGuestLoginView(APIView):
         }, status=status.HTTP_200_OK)
 
         setCookies(response, access_token, refresh)
-        print(response.cookies)
 
         return response
 
