@@ -43,16 +43,10 @@ class RegisterSerializer(ModelSerializer):
 
 
 
+
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
         token['uuid'] = str(user.id)
         return token
-
-    def validate(self, attrs):
-        data = super().validate(attrs)
-        
-        data["socket_token"] = data["access"]  # WebSocket token (same as auth token)
-
-        return data
