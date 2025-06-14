@@ -1,7 +1,6 @@
 
 
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework.exceptions import AuthenticationFailed
 
 class CookieJWTAuthentication(JWTAuthentication):
     def authenticate(self, request):
@@ -11,7 +10,10 @@ class CookieJWTAuthentication(JWTAuthentication):
 
         validated_token = self.get_validated_token(access_token)
         return self.get_user(validated_token), validated_token
-    
+
+    def authenticate_header(self, request):
+        return 'Cookie'  # or just return None
+
 
 
 from channels.db import database_sync_to_async
@@ -24,7 +26,7 @@ from django.contrib.auth.models import AnonymousUser
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
 
 from chat.serializers import CustomTokenObtainPairSerializer
-from e2ee_chatapp.settings import DEBUG
+from e2ee_chatapp.settings import DEBUG, SAME_SITE
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -54,15 +56,11 @@ class TokenAuthMiddleware(BaseMiddleware):
     @database_sync_to_async
     def get_user(self, scope):
         """ Vaidates JWT token and returns the user object if valid """
-        # query_string = scope["query_string"].decode()  # Extract query parameters
-        # params = parse_qs(query_string)
-        # token = params.get("token", [None])[0]
 
         headers = dict(scope["headers"])
         cookie_header = headers.get(b"cookie", b"").decode()  # Extract cookies from headers
         cookies = {cookie.split("=")[0]: cookie.split("=")[1] for cookie in cookie_header.split("; ") if "=" in cookie}
         token = cookies.get("access_token")  # Replace 'access_token' with your cookie name
-
 
         if not token:
             return AnonymousUser()
@@ -142,7 +140,8 @@ class CookieGuestLoginView(APIView):
 
         guest_user = User.objects.create_user(
             username=random_username,
-            password=None  # No password
+            password=None,  # No password
+            is_guest=True
         )
         guest_user.is_active = True
         guest_user.save()
@@ -161,6 +160,7 @@ class CookieGuestLoginView(APIView):
         setCookies(response, access_token, refresh)
 
         return response
+    
 
 def setCookies(response, access, refresh):
     if access:
@@ -169,7 +169,8 @@ def setCookies(response, access, refresh):
             value=access,
             httponly=True,
             secure=not DEBUG,
-            samesite='Lax'
+            samesite=SAME_SITE,
+            max_age=60*60*24*3
         )
 
     if refresh:
@@ -178,6 +179,7 @@ def setCookies(response, access, refresh):
             value=str(refresh),
             httponly=True,
             secure=not DEBUG,
-            samesite='Lax'
+            samesite=SAME_SITE,
+            max_age=60*60*24*7
         )
 

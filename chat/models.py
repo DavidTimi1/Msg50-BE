@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
 import threading
 import uuid
 
@@ -15,6 +16,8 @@ class User(AbstractUser):
 
     bio = models.TextField(blank=True, default="Heyy👋, I'm new on this app")
     dp = models.TextField(blank=True, null=True) # url to user's profile pic
+    is_guest = models.BooleanField(default=False, null=True)
+    joined = models.DateTimeField(default=timezone.now)
 
     # Resolve reverse accessor conflicts
     groups = models.ManyToManyField(
@@ -27,6 +30,17 @@ class User(AbstractUser):
         related_name='custom_user_set',  # Avoid conflict with 'auth.User.user_permissions'
         blank=True
     )
+
+    def save(self, *args, **kwargs):
+        # for existing users
+        if self.is_guest is None:
+            self.is_guest = self.username.startswith("guest_")
+
+        super().save(*args, **kwargs)
+
+
+
+
 
     def __str__(self):
         return self.username + ", " + self.bio

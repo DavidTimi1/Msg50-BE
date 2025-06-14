@@ -4,12 +4,14 @@ from django.conf import settings
 from django.urls import path, include
 from chat.token_auth import CookieGuestLoginView, CookieTokenObtainPairView, CookieTokenRefreshView, CookieTokenVerifyView
 from chat.views import RegisterView
-from .view import health_check, ServeMediaFileView
+from .view import health_check, ServeMediaFileView, run_stale_users_cleanup
 from django.conf.urls.static import static
 
 
 urlpatterns = [
     path('healthz', health_check, name='health_check'),
+    path('cleanup/stale-users', run_stale_users_cleanup, name='cleanup_stale_users'),
+
     path('admin/', admin.site.urls),
     path('feedback/', include("feedback.urls")),
     

@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-e26u0t$r-pvk!^mieigd!)9a)edm_)^nhypu(cl3asf#@_ip5$
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "True") == "True"
-HOST_NAME = "localhost" if DEBUG else ( os.environ.get("RENDER_EXTERNAL_HOSTNAME") or os.environ.get("HOST_NAME") )
+HOST_NAME = "127.0.0.1" if DEBUG else ( os.environ.get("RENDER_EXTERNAL_HOSTNAME") or os.environ.get("HOST_NAME") )
 FRONTEND_URL = "http://localhost:3000" if DEBUG else os.environ.get("FRONTEND_URL")
 
 ALLOWED_HOSTS = [HOST_NAME]
@@ -121,9 +121,10 @@ DATABASES = {
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'chat.token_auth.CookieJWTAuthentication',
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
 }
+
+SAME_SITE = 'None'
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=3),
@@ -134,17 +135,17 @@ SIMPLE_JWT = {
     'TOKEN_COOKIE_NAME': 'access_token',
     'TOKEN_COOKIE_SECURE': not DEBUG,
     'TOKEN_COOKIE_HTTPONLY': True,
-    'TOKEN_COOKIE_SAMESITE': 'None',
+    'TOKEN_COOKIE_SAMESITE': SAME_SITE,
     'REFRESH_TOKEN_COOKIE_NAME': 'refresh_token',
     'REFRESH_TOKEN_COOKIE_SECURE': not DEBUG,
     'REFRESH_TOKEN_COOKIE_HTTPONLY': True,
-    'REFRESH_TOKEN_COOKIE_SAMESITE': 'None',
+    'REFRESH_TOKEN_COOKIE_SAMESITE': SAME_SITE,
 }
 
 # Add CSRF protection for cookies
 CSRF_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_HTTPONLY = True
-CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = SAME_SITE
 
 
 # Password validation
