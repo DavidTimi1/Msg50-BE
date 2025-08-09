@@ -168,7 +168,7 @@ def setCookies(response, access, refresh):
             key='access_token',
             value=access,
             httponly=True,
-            secure=not DEBUG,
+            secure=True,
             samesite=SAME_SITE,
             max_age=60*60*24*3
         )
@@ -178,7 +178,7 @@ def setCookies(response, access, refresh):
             key='refresh_token',
             value=str(refresh),
             httponly=True,
-            secure=not DEBUG,
+            secure=True,
             samesite=SAME_SITE,
             max_age=60*60*24*7
         )
