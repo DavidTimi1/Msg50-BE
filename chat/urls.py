@@ -1,15 +1,10 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import MediaAccessView, MessageViewSet, MediaUploadView, UserProfileEdit, UserPublicKeyView, index, UserView
-
-# Create a router for the ViewSet
-router = DefaultRouter()
-router.register(r'messages', MessageViewSet, basename='message')
+from .views import MediaAccessView, MediaUploadView, UserProfileEdit, UserPublicKeyView, index, UserView
 
 # Define the urlpatterns for the app
 urlpatterns = [
-    path('', index, name='index'),  # Index view    
-    path('messages-crud/', include(router.urls)),  # MessageViewSet endpoints (CRUD operations)
+    path('', index, name='index'),  # Index view
     
     path('media/<str:uuid>', MediaAccessView.as_view(), name='media-access'),  # Media upload endpoint
     path('media/upload/', MediaUploadView.as_view(), name='media-upload'),  # Media upload endpoint

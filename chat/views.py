@@ -22,45 +22,9 @@ from e2ee_chatapp.settings import ENCRYPTED_MEDIA_ROOT, MEDIA_ROOT
 from .serializers import UserSerializer, MessageSerializer, RegisterSerializer
 from .models import Message, Media
 
-
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
-
-
-class MessageViewSet(viewsets.ModelViewSet):
-    """CRUD operations for messages."""
-    authentication_classes = [CookieJWTAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        # Show only messages sent to the logged-in user
-        return self.queryset.filter(receiver_id=self.request.user)
-
-    def post(self, request):
-        data = request.data
-        iv = data.get('iv')
-        encrypted_key = data.get('key')
-        file_id = data.get('file')
-        encrypted_data = data.get('data')
-        
-        # Generate UUID on the backend
-        uuid_value = uuid.uuid4()
-
-        # Create and save the message
-        message = Message.objects.create(
-            uuid=uuid_value,
-            iv=iv,
-            encrypted_key=encrypted_key,
-            file_id=file_id,
-            encrypted_data=encrypted_data,
-            sender=request.user
-        )
-
-        # Serialize the message
-        serializer = MessageSerializer(message)
-
-        return Response(serializer.data, status=201)
 
 
 class MediaAccessView(APIView):
@@ -73,7 +37,7 @@ class MediaAccessView(APIView):
 
         # Check if the user has access to the media file
         if request.user.id not in media.access_ids.values_list('id', flat=True):
-            return Response({"error": "You do not have permission to access this file."}, status=403)
+            return Response({"detail": "You do not have permission to access this file."}, status=403)
         
         if request.GET.get("metadata") is not None:
             # send metadata without recipients property
@@ -96,7 +60,7 @@ class MediaUploadView(APIView):
         json_metadata = request.data.get('metadata')
         # Handle file uploads
         if not (file_data and json_metadata):
-            return Response("No file data specified", 404)
+            return Response({"detail": "No file data specified"}, 404)
         
         file_path = save_to_file(ENCRYPTED_MEDIA_ROOT, file_data, 'bin')
         metadata = json.loads(json_metadata)

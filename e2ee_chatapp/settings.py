@@ -42,6 +42,15 @@ CORS_ALLOWED_ORIGINS = [
 # Allow credentials (cookies, Authorization headers, etc.)
 CORS_ALLOW_CREDENTIALS = True
 
+CORS_ALLOW_METHODS = [
+    "GET",
+    "POST",
+    "OPTIONS",
+    "PUT",
+    "PATCH",
+    "DELETE",
+]
+
 # Application definition
 
 INSTALLED_APPS = [
