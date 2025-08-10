@@ -14,9 +14,9 @@ from rest_framework import viewsets, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from chat.token_auth import CookieJWTAuthentication
 from e2ee_chatapp.settings import ENCRYPTED_MEDIA_ROOT, MEDIA_ROOT
 
 from .serializers import UserSerializer, MessageSerializer, RegisterSerializer
@@ -30,7 +30,7 @@ User = get_user_model()
 
 class MessageViewSet(viewsets.ModelViewSet):
     """CRUD operations for messages."""
-    authentication_classes = [JWTAuthentication]
+    authentication_classes = [CookieJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
@@ -65,7 +65,7 @@ class MessageViewSet(viewsets.ModelViewSet):
 
 class MediaAccessView(APIView):
     """Access uploaded media files."""
-    authentication_classes = [JWTAuthentication]
+    authentication_classes = [CookieJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request, uuid):
@@ -87,7 +87,7 @@ class MediaAccessView(APIView):
 
 class MediaUploadView(APIView):
     """Upload encrypted media files."""
-    authentication_classes = [JWTAuthentication]
+    authentication_classes = [CookieJWTAuthentication]
     permission_classes = [IsAuthenticated]    
 
     def post(self, request):
@@ -116,7 +116,7 @@ class MediaUploadView(APIView):
 
 class UserPublicKeyView(APIView):
     """Fetch the public key of a user based on their username."""
-    authentication_classes = [JWTAuthentication]
+    authentication_classes = [CookieJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -152,7 +152,7 @@ class UserPublicKeyView(APIView):
 
 class UserProfileEdit(APIView):
     """Edit a user's display picture (profile picture) and bio."""
-    authentication_classes = [JWTAuthentication]
+    authentication_classes = [CookieJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
