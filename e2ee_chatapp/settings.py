@@ -104,11 +104,21 @@ WSGI_APPLICATION = 'e2ee_chatapp.wsgi.application'
 
 # Channels configuration
 ASGI_APPLICATION = "e2ee_chatapp.asgi.application"
+
+REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
+REDIS_PORT = os.environ.get("REDIS_PORT", 6379)
+
 CHANNEL_LAYERS = {
     "default": {
-        "BACKEND": "channels.layers.InMemoryChannelLayer",
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [(REDIS_HOST, REDIS_PORT)],
+        },
     },
 }
+
+# Redis connection URL for application use (presence, cache, etc.)
+REDIS_URL = os.environ.get("REDIS_URL", f"redis://{REDIS_HOST}:{REDIS_PORT}/0")
 
 
 # Database
