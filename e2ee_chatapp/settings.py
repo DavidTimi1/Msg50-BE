@@ -118,15 +118,12 @@ import dj_database_url
 USE_SQLITE = os.environ.get("USE_SQLITE", "False") == "True"
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-} if DEBUG and USE_SQLITE else {
-    'default': dj_database_url.config(
-        default=os.environ.get("DATABASE_URL"),
+    "default": dj_database_url.config(
+        default=os.environ.get(
+            "DATABASE_URL",
+            "sqlite:///db.sqlite3"
+        ),
         conn_max_age=600,
-        ssl_require=True,
     )
 }
 
