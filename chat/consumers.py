@@ -1,12 +1,11 @@
-from email import message
 import json
-import string
 
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.contrib.auth import get_user_model
 from channels.db import database_sync_to_async
 
 from .models import Message
+from .redis_client import redis_client
 
 
 User = get_user_model()
@@ -15,33 +14,42 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         """Authenticate user via WebSocket token."""
         current_user = self.scope.get("user", None)
-        self.user_id = current_user.id
 
-        if not current_user.is_authenticated:
+        if not current_user or not current_user.is_authenticated:
             print("User is not authenticated")
             await self.close(400, "User is not authenticated")
             return
+        
+        self.user_id = current_user.id
 
         self.group_name = f"chat_{self.user_id}"
+        await redis_client.set(
+            f"user_online:{str(self.user_id)}",
+            "1",
+            ex=60
+        )
         
         # Join the user's personal channel group
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()
 
 
-    async def disconnect(self, close_code):
-        if self.scope["user"].is_authenticated:
+    async def disconnect(self, code):
+        current_user = self.scope.get("user", None)
+
+        if current_user and current_user.is_authenticated:
+            await redis_client.delete(f"user_online:{str(self.user_id)}")
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
         
-        print("Closing connection", close_code)
+        print("Closing connection", code)
 
     
-    async def receive(self, text_data):
-        json_payload: dict = json.loads(text_data)
-        action: string = json_payload.get("action")
-        receiver_id: string = json_payload.get("receiverID")
-        id: string = json_payload.get("id")
-        encrypted_data: string = json_payload.get("data")
+    async def receive(self, text_data=None, bytes_data=None):
+        json_payload: dict = json.loads(text_data or bytes_data or "{}")
+        action = json_payload.get("action")
+        receiver_id = json_payload.get("receiverID")
+        id = json_payload.get("id")
+        encrypted_data = json_payload.get("data")
 
         if action == "ready":
             # Check if the user has any queued messages
@@ -57,7 +65,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.send_message(receiver_id, message, action)
 
         elif action == "status-change":
-            await self.send_status(receiver_id, message, action)
+            await self.send_status(receiver_id, message)
 
 
     async def send_message(self, receiver_id, message, action, saved = False):
@@ -104,9 +112,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
 
     async def is_online(self, user_id):
-        # This should check from an actual user online tracking system
-        return user_id in [grp.split("_")[-1] for grp in self.channel_layer.groups]
+        return bool(await redis_client.exists(f"user_online:{str(user_id)}"))
 
+    async def start_typing(self, user_id, receiver_id):
+        await redis_client.set(f"typing:{str(user_id)}:{str(receiver_id)}", "1", ex=5)
+
+    async def stop_typing(self, user_id, receiver_id):
+        await redis_client.delete(f"typing:{str(user_id)}:{str(receiver_id)}")
+
+    async def is_typing(self, user_id, receiver_id):
+        return bool(await redis_client.exists(f"typing:{str(user_id)}:{str(receiver_id)}"))
 
     async def read_messages(self, user_id):
         queued_messages = await self.get_queued_messages(user_id)
@@ -121,19 +136,23 @@ class ChatConsumer(AsyncWebsocketConsumer):
             elif action == "status-change":
                 sent = await self.send_status(user_id, message, True)
 
-            sent and await self.delete_message(message["id"], user_id)
+            if sent:
+                await self.delete_message(message["id"], user_id)
 
 
     @database_sync_to_async
     def get_queued_messages(self, user_id):
-        queued_messages = Message.objects.filter(receiver_id=user_id)
+        # Use values_list to avoid instantiating full model objects and limit batch size
+        qs = (
+            Message.objects
+            .filter(receiver_id=user_id)
+            .order_by('created_at')
+            .values_list('status', 'encrypted_message', 'msg_id')[:100]
+        )
 
         return [
-            ( "status-change" if message.status else "new-message", {
-                "data": message.encrypted_message,
-                "id": message.msg_id
-            })
-            for message in queued_messages
+            ("status-change" if status else "new-message", {"data": encrypted_message, "id": msg_id})
+            for status, encrypted_message, msg_id in qs
         ]
 
 

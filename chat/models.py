@@ -48,9 +48,10 @@ class User(AbstractUser):
 
 class Message(models.Model):
     msg_id = models.TextField(null=True)
-    receiver_id = models.UUIDField()
+    receiver_id = models.UUIDField(db_index=True)
     encrypted_message = models.JSONField()
     status = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     # status can be [ "s"-sent, "d"-delivered, "r"-read, "x"- deleted ]
 
@@ -84,10 +85,15 @@ class PrefetchLink(models.Model):
 
 @receiver(post_save, sender=PrefetchLink)
 def delete_after_timeout(sender, instance, **kwargs):
+    # Prefer scheduled tasks (Celery/cron) for reliable deletion across processes.
+    # For now, keep a process-local fallback but make it short-lived and non-leaking.
     def delete_instance():
-        instance.delete()
-        print(f"PrefetchLink object with URL {instance.url} has been deleted after timeout.")
+        try:
+            instance.delete()
+            print(f"PrefetchLink object with URL {instance.url} has been deleted after timeout.")
+        except Exception:
+            pass
 
-    # Set the timer for 1 hour (3600 seconds)
     timer = threading.Timer(3600, delete_instance)
+    timer.daemon = True
     timer.start()
