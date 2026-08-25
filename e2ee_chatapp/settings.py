@@ -128,15 +128,23 @@ REDIS_URL = os.environ.get("REDIS_URL", f"redis://{REDIS_HOST}:{REDIS_PORT}/0")
 import dj_database_url
 USE_SQLITE = os.environ.get("USE_SQLITE", "False") == "True"
 
-DATABASES = {
-    "default": dj_database_url.config(
-        default=os.environ.get(
-            "DATABASE_URL",
-            "sqlite:///db.sqlite3"
-        ),
-        conn_max_age=600,
-    )
-}
+if USE_SQLITE:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
+else:
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=os.environ.get(
+                "DATABASE_URL",
+                "sqlite:///db.sqlite3"
+            ),
+            conn_max_age=600,
+        )
+    }
 
 
 REST_FRAMEWORK = {
