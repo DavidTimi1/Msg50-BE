@@ -1,4 +1,5 @@
 from .models import Message, Media
+from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer, CharField, ValidationError
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -12,6 +13,12 @@ class UserSerializer(ModelSerializer):
     class Meta:
         model = User
         fields = ['id', "username", "email", "public_key", "bio", "profile_data", "dp"]
+
+
+class PublicUserSerializer(ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', "username", "public_key", "bio", "dp"]
 
 
 class MessageSerializer(ModelSerializer):
@@ -31,7 +38,7 @@ class RegisterSerializer(ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('username', 'email', 'password')  # Add other fields if needed
+        fields = ('username', 'email', 'password')
 
     def create(self, validated_data):
         user = User.objects.create_user(
@@ -42,11 +49,51 @@ class RegisterSerializer(ModelSerializer):
         return user
 
 
-
-
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
         token['uuid'] = str(user.id)
         return token
+
+
+class LoginRequestSerializer(serializers.Serializer):
+    username = serializers.CharField(help_text="Registered username")
+    password = serializers.CharField(write_only=True, help_text="User password")
+
+
+class AuthSuccessSerializer(serializers.Serializer):
+    message = serializers.CharField()
+    user_id = serializers.UUIDField()
+    username = serializers.CharField()
+
+
+class UserPublicKeySetSerializer(serializers.Serializer):
+    publicKey = serializers.CharField(help_text="PEM or Base64 encoded public key string")
+
+
+class UserProfileEditSerializer(serializers.Serializer):
+    dp = serializers.ImageField(required=False, help_text="User profile picture file (jpg, jpeg, png)")
+    bio = serializers.CharField(required=False, max_length=500, help_text="User bio/status string")
+
+
+class UserProfileEditResponseSerializer(serializers.Serializer):
+    success = serializers.CharField()
+    new_dp = serializers.CharField(allow_null=True)
+
+
+class MediaUploadSerializer(serializers.Serializer):
+    file = serializers.FileField(help_text="Encrypted media binary payload")
+    metadata = serializers.CharField(help_text="JSON string with recipients array and metadata")
+
+
+class MediaUploadResponseSerializer(serializers.Serializer):
+    src = serializers.UUIDField(help_text="Access UUID for uploaded media")
+
+
+class UserSettingsSerializer(serializers.Serializer):
+    profile_data = serializers.JSONField(help_text="User preference settings key-value JSON")
+
+
+class SimpleSuccessResponseSerializer(serializers.Serializer):
+    detail = serializers.CharField()
