@@ -17,14 +17,21 @@ class MediaUploadViewTest(APITestCase):
         self.url = reverse('media-upload')
 
     def test_post_media(self):
+        import json
+        import os
+        
         with open('testfile.txt', 'w') as f:
             f.write('test content')
-        with open('testfile.txt', 'rb') as f:
-            data = {
-                'file': f,
-                'metadata': {'receiver_id': [self.user.id]}
-            }
-            response = self.client.post(self.url, data, format='multipart')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(Media.objects.count(), 1)
-        self.assertEqual(Media.objects.get().access_ids.count(), 1)
+        try:
+            with open('testfile.txt', 'rb') as f:
+                data = {
+                    'file': f,
+                    'metadata': json.dumps({'recipients': [self.user.username]})
+                }
+                response = self.client.post(self.url, data, format='multipart')
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(Media.objects.count(), 1)
+            self.assertEqual(Media.objects.get().access_ids.count(), 1)
+        finally:
+            if os.path.exists('testfile.txt'):
+                os.remove('testfile.txt')
