@@ -73,27 +73,8 @@ class Media(models.Model):
 class PrefetchLink(models.Model):
     url = models.URLField()
     preview_data = models.JSONField()  # Storing OpenGraph or metadata
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.url
-        
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        # Add your custom logic here
-        self.after_initialization()
 
-
-@receiver(post_save, sender=PrefetchLink)
-def delete_after_timeout(sender, instance, **kwargs):
-    # Prefer scheduled tasks (Celery/cron) for reliable deletion across processes.
-    # For now, keep a process-local fallback but make it short-lived and non-leaking.
-    def delete_instance():
-        try:
-            instance.delete()
-            print(f"PrefetchLink object with URL {instance.url} has been deleted after timeout.")
-        except Exception:
-            pass
-
-    timer = threading.Timer(3600, delete_instance)
-    timer.daemon = True
-    timer.start()
