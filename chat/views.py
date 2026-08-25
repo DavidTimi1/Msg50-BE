@@ -4,22 +4,34 @@ import random
 from string import ascii_lowercase, digits
 import uuid
 
-# Create your views here.
 from django.views.decorators.csrf import csrf_exempt
 from django.http import FileResponse, JsonResponse
-from django.contrib.auth import login
-
 from django.shortcuts import get_object_or_404, render
-from rest_framework import viewsets, generics
+from rest_framework import viewsets, generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.parsers import MultiPartParser, FormParser
+
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 
 from chat.token_auth import CookieJWTAuthentication
+from chat.throttling import MediaUploadRateThrottle, PublicKeyRateThrottle, AuthRateThrottle
 from e2ee_chatapp.settings import ENCRYPTED_MEDIA_ROOT, MEDIA_ROOT
 
-from .serializers import UserSerializer, MessageSerializer, RegisterSerializer
+from .serializers import (
+    UserSerializer, 
+    PublicUserSerializer,
+    MessageSerializer, 
+    RegisterSerializer,
+    UserPublicKeySetSerializer,
+    UserProfileEditSerializer,
+    UserProfileEditResponseSerializer,
+    MediaUploadSerializer,
+    MediaUploadResponseSerializer,
+    UserSettingsSerializer,
+    SimpleSuccessResponseSerializer
+)
 from .models import Message, Media
 
 from django.contrib.auth import get_user_model
@@ -28,10 +40,22 @@ User = get_user_model()
 
 
 class MediaAccessView(APIView):
-    """Access uploaded media files."""
+    """Access uploaded encrypted media files."""
     authentication_classes = [CookieJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Retrieve or stream encrypted media file",
+        description="Serve encrypted media blob or metadata by UUID if caller is authorized in recipient list.",
+        parameters=[
+            OpenApiParameter("metadata", OpenApiTypes.STR, location=OpenApiParameter.QUERY, description="Set to true to retrieve JSON metadata instead of binary blob", required=False)
+        ],
+        responses={
+            200: OpenApiTypes.BINARY,
+            403: SimpleSuccessResponseSerializer,
+            404: SimpleSuccessResponseSerializer
+        }
+    )
     def get(self, request, uuid):
         media = get_object_or_404(Media, uuid=uuid)
 
@@ -45,46 +69,65 @@ class MediaAccessView(APIView):
 
         # Serve the file
         response = FileResponse(open(media.filePath, "rb"), content_type='application/octet-stream')
-        response['Content-Disposition'] = f'attachment; filename="{media.metadata.get("name")}.bin"'
+        response['Content-Disposition'] = f'attachment; filename="{media.metadata.get("name", "media")}.bin"'
         return response        
 
 
 class MediaUploadView(APIView):
-    """Upload encrypted media files."""
+    """Upload encrypted media files with recipient access control."""
     authentication_classes = [CookieJWTAuthentication]
-    permission_classes = [IsAuthenticated]    
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [MediaUploadRateThrottle]
+    parser_classes = [MultiPartParser, FormParser]
 
+    @extend_schema(
+        summary="Upload encrypted media file",
+        description="Upload binary file payload with JSON metadata listing allowed recipient usernames.",
+        request=MediaUploadSerializer,
+        responses={200: MediaUploadResponseSerializer, 400: SimpleSuccessResponseSerializer}
+    )
     def post(self, request):
-
         file_data = request.FILES.get('file')
         json_metadata = request.data.get('metadata')
-        # Handle file uploads
+
         if not (file_data and json_metadata):
-            return Response({"detail": "No file data specified"}, 404)
+            return Response({"detail": "No file data or metadata specified"}, status=400)
         
         file_path = save_to_file(ENCRYPTED_MEDIA_ROOT, file_data, 'bin')
-        metadata = json.loads(json_metadata)
+        try:
+            metadata = json.loads(json_metadata) if isinstance(json_metadata, str) else json_metadata
+        except Exception:
+            metadata = {}
+
         allowed = [request.user.id]
 
-        for recipient in metadata["recipients"]:
+        recipients = metadata.get("recipients", [])
+        for recipient in recipients:
             try:
                 allowed.append(User.objects.get(username=recipient))
-            except:
+            except User.DoesNotExist:
                 continue
 
         media = Media.objects.create(metadata=metadata, filePath=file_path)
-
         media.access_ids.set(allowed)
-        return Response({"src": media.uuid})
+        return Response({"src": str(media.uuid)}, status=200)
 
 
 class UserPublicKeyView(APIView):
-    """Fetch the public key of a user based on their username."""
+    """Fetch or set user E2EE public keys."""
     authentication_classes = [CookieJWTAuthentication]
     permission_classes = [IsAuthenticated]
+    throttle_classes = [PublicKeyRateThrottle]
 
+    @extend_schema(
+        summary="Fetch public keys by list of usernames",
+        description="Retrieve public keys for given array of usernames in query string.",
+        parameters=[
+            OpenApiParameter("username", OpenApiTypes.STR, location=OpenApiParameter.QUERY, description="Username to fetch key for (can be passed multiple times)", many=True)
+        ],
+        responses={200: OpenApiTypes.OBJECT}
+    )
     def get(self, request):
-        # get all request queries id as a list
         user_list = request.GET.getlist('username', [])
         hash_bucket = {}
 
@@ -92,115 +135,158 @@ class UserPublicKeyView(APIView):
             try:
                 user = User.objects.get(username=username)
                 user_id = str(user.id)
-
-            except:
-                # user existeth not
+            except User.DoesNotExist:
                 pass
             else:
                 hash_bucket[user_id] = user.public_key if user.public_key else None
 
         return Response(hash_bucket)
-    
 
+    @extend_schema(
+        summary="Update current user's E2EE public key",
+        description="Set or replace current user's public key string.",
+        request=UserPublicKeySetSerializer,
+        responses={200: SimpleSuccessResponseSerializer}
+    )
     def post(self, request):
-        public_key = request.data.get("publicKey")
+        serializer = UserPublicKeySetSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        public_key = serializer.validated_data.get("publicKey")
         
-        if public_key:
-            # if request.user.public_key:
-                # return Response({"Error": "Would require 2fa for this action to be completed"}, status=400)
-            
-            request.user.public_key = public_key
-            request.user.save()
-            return Response({"success": "Public_key successfully set"})
+        request.user.public_key = public_key
+        request.user.save()
+        return Response({"success": "Public_key successfully set"})
 
 
 class UserProfileEdit(APIView):
-    """Edit a user's display picture (profile picture) and bio."""
+    """Edit display picture or bio."""
     authentication_classes = [CookieJWTAuthentication]
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
 
+    @extend_schema(
+        summary="Update user profile (DP / Bio)",
+        description="Upload a new profile image (jpg, jpeg, png) or set bio string.",
+        request=UserProfileEditSerializer,
+        responses={200: UserProfileEditResponseSerializer, 400: SimpleSuccessResponseSerializer}
+    )
     def post(self, request):
-        # Get the uploaded file from the request
         file_data = request.FILES.get('dp')
         new_bio = request.data.get('bio')
         file_path = None
         
         if file_data:
-            # Validate the file type (optional)
             ext = file_data.name.split('.')[-1].lower()
             if ext not in ['jpg', 'jpeg', 'png']:
-                return Response("Invalid file type", status=400)
+                return Response({"detail": "Invalid file type. Only jpg, jpeg, png allowed."}, status=400)
 
-            file_path = save_to_file(MEDIA_ROOT, file_data, ext)
-
-            # Update the user's profile picture path in the database
+            file_path = str(save_to_file(MEDIA_ROOT, file_data, ext))
             request.user.dp = file_path
 
         if new_bio:
-            # Update the user's bio in the database
             request.user.bio = new_bio
 
         request.user.save()
-
         return Response({"success": "Profile has been updated", "new_dp": file_path}, status=200)
 
-    
+
 class UserView(APIView):
-    """Fetch the data of a user based on their username."""
-    serializer_class = UserSerializer
+    """Fetch user profile details."""
+    permission_classes = [AllowAny]
+    authentication_classes = [CookieJWTAuthentication]
 
+    @extend_schema(
+        summary="Get user profile details",
+        description="Retrieve profile details for given username or 'me' for currently logged in user.",
+        responses={200: UserSerializer}
+    )
     def get(self, request, username):
-        query = username if username != "me" else request.user.username
+        query = username if username != "me" else (request.user.username if request.user.is_authenticated else "")
         user = get_object_or_404(User, username=query)
-        
-        serializer = self.serializer_class(user)
 
-        # if user is authenticated show all the data
         if request.user.is_authenticated:
+            serializer = UserSerializer(user)
             return Response(serializer.data)
         
-        # if user is not authenticated show only public data in html
-        return render(request, "chat/profile.html", {"user": serializer.data})
+        serializer = PublicUserSerializer(user)
+        return Response(serializer.data)
 
 
+class UserSettingsView(APIView):
+    """Get or update user settings / preferences."""
+    authentication_classes = [CookieJWTAuthentication]
+    permission_classes = [IsAuthenticated]
 
-# Registration View
+    @extend_schema(
+        summary="Get user settings JSON",
+        description="Retrieve user profile_data JSON object containing preferences.",
+        responses={200: UserSettingsSerializer}
+    )
+    def get(self, request):
+        return Response({"profile_data": request.user.profile_data})
+
+    @extend_schema(
+        summary="Update user settings JSON",
+        description="Update key-value pairs in user profile_data preferences.",
+        request=UserSettingsSerializer,
+        responses={200: UserSettingsSerializer}
+    )
+    def post(self, request):
+        serializer = UserSettingsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        updated_data = serializer.validated_data.get('profile_data', {})
+        request.user.profile_data.update(updated_data)
+        request.user.save()
+        return Response({"profile_data": request.user.profile_data})
+
+
+class UserSearchView(APIView):
+    """Search registered users by username."""
+    authentication_classes = [CookieJWTAuthentication]
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        summary="Search users by username query",
+        description="Returns list of users matching query string for contact discovery. Public fields only if unauthenticated.",
+        parameters=[
+            OpenApiParameter("q", OpenApiTypes.STR, location=OpenApiParameter.QUERY, description="Search term for username", required=True)
+        ],
+        responses={200: UserSerializer(many=True)}
+    )
+    def get(self, request):
+        query = request.GET.get("q", "").strip()
+        if not query:
+            return Response([])
+            
+        users = User.objects.filter(username__icontains=query)
+        if request.user.is_authenticated:
+            users = users.exclude(id=request.user.id)
+            serializer = UserSerializer(users[:20], many=True)
+        else:
+            serializer = PublicUserSerializer(users[:20], many=True)
+            
+        return Response(serializer.data)
+
+
 class RegisterView(generics.CreateAPIView):
+    """User registration endpoint."""
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
+    permission_classes = [AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
+    @extend_schema(
+        summary="Register a new user account",
+        description="Creates a new account with username, email, and password.",
+        responses={201: UserSerializer}
+    )
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
 
-# class GuestLoginView(APIView):
-#     """Allow users to log in as a guest without creating an account."""
-#     def post(self, request):
-#         # Generate a random username for the guest user
-#         random_username = "guest_" + ''.join(random.choices(ascii_lowercase + digits, k=8))
-
-#         # Create a temporary user
-#         guest_user = User.objects.create_user(
-#             username=random_username,
-#             password=None  # No password required for guest users
-#         )
-#         guest_user.is_active = True
-#         guest_user.save()
-
-#         # Log in the guest user
-#         login(request, guest_user)
-
-#         # Generate a JWT token for the guest user
-#         refresh = RefreshToken.for_user(guest_user)
-#         return Response({
-#             "message": "Guest login successful",
-#             "access_token": str(refresh.access_token),
-#             "refresh_token": str(refresh),
-#             "username": guest_user.username,
-#             "user_id": str(guest_user.id),
-#         }, status=200)
-    
 
 @csrf_exempt
 def index(request, methods=['GET', 'POST']):
-    # send the cookies sent by frontend as json
     cookies = request.COOKIES
     return JsonResponse(cookies)
 
