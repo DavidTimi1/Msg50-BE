@@ -4,10 +4,11 @@ Django==5.1.4
 django-cors-headers==4.6.0
 djangorestframework==3.15.2
 djangorestframework-simplejwt==5.3.1
-drf-spectacular==0.27.2
+drf-spectacular==0.30.0
 dj-database-url==2.3.0
 google-generativeai==0.8.3
-# psycopg2-binary==2.9.10
+psycopg2-binary==2.9.10
+psycopg[binary]==3.2.4
 oauthlib==3.2.2
 requests==2.32.3
 uvicorn==0.34.0
