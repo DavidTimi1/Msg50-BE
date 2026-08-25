@@ -29,7 +29,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "True") == "True"
-HOST_NAME = "127.0.0.1" if DEBUG else ( os.environ.get("RENDER_EXTERNAL_HOSTNAME") or os.environ.get("HOST_NAME") )
+HOST_NAME = "localhost" if DEBUG else ( os.environ.get("RENDER_EXTERNAL_HOSTNAME") or os.environ.get("HOST_NAME") )
 FRONTEND_URL = "http://localhost:3000" if DEBUG else os.environ.get("FRONTEND_URL")
 
 ALLOWED_HOSTS = [HOST_NAME]
@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "channels",
     "corsheaders",
+    "drf_spectacular",
 ]
 
 
@@ -104,11 +105,21 @@ WSGI_APPLICATION = 'e2ee_chatapp.wsgi.application'
 
 # Channels configuration
 ASGI_APPLICATION = "e2ee_chatapp.asgi.application"
+
+REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
+REDIS_PORT = os.environ.get("REDIS_PORT", 6379)
+
 CHANNEL_LAYERS = {
     "default": {
-        "BACKEND": "channels.layers.InMemoryChannelLayer",
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [(REDIS_HOST, REDIS_PORT)],
+        },
     },
 }
+
+# Redis connection URL for application use (presence, cache, etc.)
+REDIS_URL = os.environ.get("REDIS_URL", f"redis://{REDIS_HOST}:{REDIS_PORT}/0")
 
 
 # Database
@@ -117,24 +128,45 @@ CHANNEL_LAYERS = {
 import dj_database_url
 USE_SQLITE = os.environ.get("USE_SQLITE", "False") == "True"
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+if USE_SQLITE:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
     }
-} if DEBUG and USE_SQLITE else {
-    'default': dj_database_url.config(
-        default=os.environ.get("DATABASE_URL"),
-        conn_max_age=600,
-        ssl_require=True,
-    )
-}
+else:
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=os.environ.get(
+                "DATABASE_URL",
+                "sqlite:///db.sqlite3"
+            ),
+            conn_max_age=600,
+        )
+    }
 
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'chat.token_auth.CookieJWTAuthentication',
     ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_THROTTLE_RATES': {
+        'auth': '5/min',
+        'media_upload': '20/min',
+        'public_key': '100/min',
+        'feedback': '10/hour',
+        'anon': '100/day',
+        'user': '1000/day',
+    }
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'MSG50 Backend API',
+    'DESCRIPTION': 'API documentation for the MSG50 End-to-End Encrypted Chat Application. This schema can be imported into Postman for unit and integration testing.',
+    'VERSION': '2.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
 }
 
 SAME_SITE = 'None'

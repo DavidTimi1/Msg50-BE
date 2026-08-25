@@ -6,6 +6,7 @@ from chat.token_auth import CookieGuestLoginView, CookieTokenObtainPairView, Coo
 from chat.views import RegisterView
 from .view import health_check, ServeMediaFileView, run_stale_users_cleanup
 from django.conf.urls.static import static
+from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
 
 api_v2_patterns = [
@@ -25,5 +26,8 @@ api_v2_patterns = [
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/v2/', include(api_v2_patterns)),
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/schema/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
     path('media/<str:file_name>', ServeMediaFileView.as_view(), name='media_file'),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

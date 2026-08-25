@@ -48,9 +48,10 @@ class User(AbstractUser):
 
 class Message(models.Model):
     msg_id = models.TextField(null=True)
-    receiver_id = models.UUIDField()
+    receiver_id = models.UUIDField(db_index=True)
     encrypted_message = models.JSONField()
     status = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     # status can be [ "s"-sent, "d"-delivered, "r"-read, "x"- deleted ]
 
@@ -72,22 +73,8 @@ class Media(models.Model):
 class PrefetchLink(models.Model):
     url = models.URLField()
     preview_data = models.JSONField()  # Storing OpenGraph or metadata
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.url
-        
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        # Add your custom logic here
-        self.after_initialization()
 
-
-@receiver(post_save, sender=PrefetchLink)
-def delete_after_timeout(sender, instance, **kwargs):
-    def delete_instance():
-        instance.delete()
-        print(f"PrefetchLink object with URL {instance.url} has been deleted after timeout.")
-
-    # Set the timer for 1 hour (3600 seconds)
-    timer = threading.Timer(3600, delete_instance)
-    timer.start()
