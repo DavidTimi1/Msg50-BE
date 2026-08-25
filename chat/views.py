@@ -259,12 +259,12 @@ class UserSearchView(APIView):
         if not query:
             return Response([])
             
-        users = User.objects.filter(username__icontains=query)[:20]
+        users = User.objects.filter(username__icontains=query)
         if request.user.is_authenticated:
             users = users.exclude(id=request.user.id)
-            serializer = UserSerializer(users, many=True)
+            serializer = UserSerializer(users[:20], many=True)
         else:
-            serializer = PublicUserSerializer(users, many=True)
+            serializer = PublicUserSerializer(users[:20], many=True)
             
         return Response(serializer.data)
 
