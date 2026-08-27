@@ -8,6 +8,8 @@
 
 MSG50 is a secure, high-performance, real-time messaging backend engineered for **End-to-End Encrypted (E2EE) chat applications**. It acts as a zero-knowledge trust layer, routing encrypted binary files, handling E2EE key mapping exchanges, and managing offline queues without access to the message contents.
 
+**FRONTEND REPOSITORY [HERE](https://github.com/DavidTimi1/Message_50)**
+
 ---
 
 ## 📖 Related Guides
