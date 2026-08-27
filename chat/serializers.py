@@ -6,19 +6,33 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from django.contrib.auth import get_user_model
 
+from chat.services.media_service import MediaService
+
 User = get_user_model()
 
 
 class UserSerializer(ModelSerializer):
+    dp = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = ['id', "username", "email", "public_key", "bio", "profile_data", "dp"]
 
+    def get_dp(self, obj):
+        request = self.context.get('request')
+        return MediaService.build_profile_picture_url(obj.dp, request)
+
 
 class PublicUserSerializer(ModelSerializer):
+    dp = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = ['id', "username", "public_key", "bio", "dp"]
+
+    def get_dp(self, obj):
+        request = self.context.get('request')
+        return MediaService.build_profile_picture_url(obj.dp, request)
 
 
 class MessageSerializer(ModelSerializer):

@@ -58,6 +58,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         # Ping-pong heartbeat
         if json_payload.get("type") == "ping":
+            if redis_client and hasattr(self, 'user_id'):
+                try:
+                    await redis_client.set(f"user_online:{str(self.user_id)}", "1", ex=60)
+                except Exception as e:
+                    logger.error(f"Redis error updating online status on ping for user {self.user_id}: {e}")
             await self.send(text_data=json.dumps({"type": "pong"}))
             return
 
@@ -124,22 +129,53 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.send_message(receiver_id, message, action)
 
     async def send_message(self, receiver_id, message, action, saved=False):
+        # Store message offline first to prevent loss during abrupt disconnections
+        if not saved:
+            await self.store_message(
+                msg_id=message["id"],
+                receiver_id=receiver_id,
+                encrypted_message=message["data"]
+            )
+
+        # Direct delivery if receiver is currently connected to this socket
+        if hasattr(self, 'user_id') and str(self.user_id) == str(receiver_id):
+            await self.send(text_data=json.dumps({"type": action, "data": message}))
+            await self.delete_message(message["id"], receiver_id)
+            return True
+
         if await self.is_online(receiver_id):
             await self.channel_layer.group_send(
                 f"chat_{receiver_id}",
                 {"type": "chat.message", "message": {"type": action, "data": message}}
             )
             return True
-        elif not saved:
-            await self.store_message(
-                msg_id=message["id"],
-                receiver_id=receiver_id,
-                encrypted_message=message["data"]
-            )
+
         return False
 
     async def send_status(self, receiver_id, message, saved=False):
-        status_message = {"action": "status", "message_id": message["id"], "data": message.get("data")}
+        status_message = {
+            "type": "status-change",
+            "data": {
+                "action": "status",
+                "message_id": message["id"],
+                "data": message.get("data")
+            }
+        }
+
+        # Store status offline first to prevent loss
+        if not saved:
+            await self.store_message(
+                msg_id=message["id"],
+                receiver_id=receiver_id,
+                encrypted_message=message["data"],
+                status=True
+            )
+
+        # Direct delivery if receiver is currently connected to this socket
+        if hasattr(self, 'user_id') and str(self.user_id) == str(receiver_id):
+            await self.send(text_data=json.dumps(status_message))
+            await self.delete_message(message["id"], receiver_id)
+            return True
 
         if await self.is_online(receiver_id):
             await self.channel_layer.group_send(
@@ -147,20 +183,20 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 {"type": "chat.status", "message": status_message}
             )
             return True
-        elif not saved:
-            await self.store_message(
-                msg_id=message["id"],
-                receiver_id=receiver_id,
-                encrypted_message=message["data"],
-                status=True
-            )
+
         return False
 
     async def chat_message(self, event):
         await self.send(text_data=json.dumps(event["message"]))
+        msg_id = event["message"].get("data", {}).get("id")
+        if msg_id:
+            await self.delete_message(msg_id, self.user_id)
 
     async def chat_status(self, event):
         await self.send(text_data=json.dumps(event["message"]))
+        msg_id = event["message"].get("data", {}).get("message_id")
+        if msg_id:
+            await self.delete_message(msg_id, self.user_id)
 
     async def chat_typing(self, event):
         await self.send(text_data=json.dumps(event["message"]))
@@ -194,6 +230,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         for msg in queued_messages:
             action, message = msg
             sent = False
+            is_status = (action == "status-change")
 
             if action == "new-message":
                 sent = await self.send_message(user_id, message, action, True)
@@ -219,9 +256,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def delete_message(self, msg_id, rec_id):
+        if not msg_id:
+            return
         try:
-            msg = Message.objects.get(msg_id=msg_id, receiver_id=rec_id)
-            msg.delete()
+            Message.objects.filter(msg_id=msg_id, receiver_id=rec_id).delete()
         except Exception as err:
             logger.error(f"Failed to delete message {msg_id}: {err}")
 

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.2.1] - 2026-08-27
+
+### Added
+- **External Storage Support**: Added configuration hooks for AWS S3 and other external storage providers in `MediaService` for both public profile pictures and encrypted private blobs.
+
+### Fixed
+- **Media Upload Endpoint**: Removed the trailing slash on the `/api/v2/media/upload` route to prevent `301 Redirect` to `GET` requests, fixing the `405 Method Not Allowed` error during file uploads.
+- **Offline Message Deletion**: Switched from `get().delete()` to `filter().delete()` in `delete_message` to safely clear duplicate queued messages/status updates for a given recipient, resolving the `MultipleObjectsReturned` exception.
+- **WebSocket Message Delivery**:
+  - Heartbeat `ping` frames now extend the Redis `user_online` key's TTL dynamically. This fixes a major bug where users online for more than 60 seconds would "expire" in Redis, causing new messages to be stored in the DB instead of being pushed in real-time.
+  - Added direct-to-socket delivery when the recipient matches the active socket connection, ensuring offline queue flushes bypass Redis/group_send layers and are fully dispatched before DB deletion.
+  - Configured custom connection timeouts (`socket_timeout: 30`, `socket_connect_timeout: 30`, `health_check_interval: 30`) in `CHANNEL_LAYERS` to resolve socket read timeout crashes under long-blocking Redis commands in production (e.g. Railway).
+
 ## [2.2.0] - 2026-08-25
 
 ### Added
