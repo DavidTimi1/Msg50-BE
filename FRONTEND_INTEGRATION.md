@@ -60,7 +60,7 @@ Base API URL: `/api/v2/`
 ### Encrypted Media
 | Endpoint | Method | Rate Limit | Description |
 | :--- | :--- | :--- | :--- |
-| `/api/v2/media/upload/` | `POST` | `20/min` | Upload encrypted media file & recipient access list |
+| `/api/v2/media/upload` | `POST` | `20/min` | Upload encrypted media file & recipient access list |
 | `/api/v2/media/<uuid>` | `GET` | `1000/day` | Download encrypted binary blob (or `?metadata=true`) |
 
 ### System & Feedback

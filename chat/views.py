@@ -17,7 +17,7 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 
 from chat.token_auth import CookieJWTAuthentication
 from chat.throttling import MediaUploadRateThrottle, PublicKeyRateThrottle, AuthRateThrottle
-from e2ee_chatapp.settings import ENCRYPTED_MEDIA_ROOT, MEDIA_ROOT
+from chat.services.media_service import MediaService
 
 from .serializers import (
     UserSerializer, 
@@ -57,20 +57,18 @@ class MediaAccessView(APIView):
         }
     )
     def get(self, request, uuid):
-        media = get_object_or_404(Media, uuid=uuid)
-
-        # Check if the user has access to the media file
-        if request.user.id not in media.access_ids.values_list('id', flat=True):
-            return Response({"detail": "You do not have permission to access this file."}, status=403)
-        
-        if request.GET.get("metadata") is not None:
-            # send metadata without recipients property
-            return JsonResponse({k: v for k, v in media.metadata.items() if k != "recipients"})
-
-        # Serve the file
-        response = FileResponse(open(media.filePath, "rb"), content_type='application/octet-stream')
-        response['Content-Disposition'] = f'attachment; filename="{media.metadata.get("name", "media")}.bin"'
-        return response        
+        metadata_only = request.GET.get("metadata") is not None
+        from django.core.exceptions import PermissionDenied
+        from django.http import Http404
+        try:
+            response_data = MediaService.get_encrypted_media_response(uuid, request.user, metadata_only=metadata_only)
+            if metadata_only:
+                return JsonResponse(response_data)
+            return response_data
+        except PermissionDenied as e:
+            return Response({"detail": str(e)}, status=403)
+        except Http404 as e:
+            return Response({"detail": str(e)}, status=404)
 
 
 class MediaUploadView(APIView):
@@ -92,25 +90,12 @@ class MediaUploadView(APIView):
 
         if not (file_data and json_metadata):
             return Response({"detail": "No file data or metadata specified"}, status=400)
-        
-        file_path = save_to_file(ENCRYPTED_MEDIA_ROOT, file_data, 'bin')
+
         try:
-            metadata = json.loads(json_metadata) if isinstance(json_metadata, str) else json_metadata
-        except Exception:
-            metadata = {}
-
-        allowed = [request.user.id]
-
-        recipients = metadata.get("recipients", [])
-        for recipient in recipients:
-            try:
-                allowed.append(User.objects.get(username=recipient))
-            except User.DoesNotExist:
-                continue
-
-        media = Media.objects.create(metadata=metadata, filePath=file_path)
-        media.access_ids.set(allowed)
-        return Response({"src": str(media.uuid)}, status=200)
+            media = MediaService.save_encrypted_media(file_data, json_metadata, request.user)
+            return Response({"src": str(media.uuid)}, status=200)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=400)
 
 
 class UserPublicKeyView(APIView):
@@ -173,21 +158,20 @@ class UserProfileEdit(APIView):
     def post(self, request):
         file_data = request.FILES.get('dp')
         new_bio = request.data.get('bio')
-        file_path = None
         
         if file_data:
-            ext = file_data.name.split('.')[-1].lower()
-            if ext not in ['jpg', 'jpeg', 'png']:
-                return Response({"detail": "Invalid file type. Only jpg, jpeg, png allowed."}, status=400)
-
-            file_path = str(save_to_file(MEDIA_ROOT, file_data, ext))
-            request.user.dp = file_path
+            try:
+                filename = MediaService.save_profile_picture(file_data)
+                request.user.dp = filename
+            except ValueError as e:
+                return Response({"detail": str(e)}, status=400)
 
         if new_bio:
             request.user.bio = new_bio
 
         request.user.save()
-        return Response({"success": "Profile has been updated", "new_dp": file_path}, status=200)
+        dp_url = MediaService.build_profile_picture_url(request.user.dp, request)
+        return Response({"success": "Profile has been updated", "new_dp": dp_url}, status=200)
 
 
 class UserView(APIView):

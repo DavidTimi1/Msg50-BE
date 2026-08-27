@@ -6,7 +6,7 @@ from .views import MediaAccessView, MediaUploadView, UserProfileEdit, UserPublic
 urlpatterns = [
     path('', index, name='index'),  # Index view
     
-    path('media/upload/', MediaUploadView.as_view(), name='media-upload'),  # Media upload endpoint
+    path('media/upload', MediaUploadView.as_view(), name='media-upload'),  # Media upload endpoint
     path('media/<str:uuid>', MediaAccessView.as_view(), name='media-access'),  # Media access endpoint
     
     path('user/public-key/', UserPublicKeyView.as_view(), name='user-public-key'),  # Public key fetch/set

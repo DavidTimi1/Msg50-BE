@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.2.1] - 2026-08-27
+
+### Added
+- **External Storage Support**: Added configuration hooks for AWS S3 and other external storage providers in `MediaService` for both public profile pictures and encrypted private blobs.
+
+### Fixed
+- **Media Upload Endpoint**: Removed the trailing slash on the `/api/v2/media/upload` route to prevent `301 Redirect` to `GET` requests, fixing the `405 Method Not Allowed` error during file uploads.
+- **Offline Message Deletion**: Switched from `get().delete()` to `filter().delete()` in `delete_message` to safely clear duplicate queued messages/status updates for a given recipient, resolving the `MultipleObjectsReturned` exception.
+
 ## [2.2.0] - 2026-08-25
 
 ### Added
