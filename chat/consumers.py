@@ -139,7 +139,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return False
 
     async def send_status(self, receiver_id, message, saved=False):
-        status_message = {"action": "status", "message_id": message["id"], "data": message.get("data")}
+        status_message = {
+            "type": "status-change",
+            "data": {
+                "action": "status",
+                "message_id": message["id"],
+                "data": message.get("data")
+            }
+        }
 
         if await self.is_online(receiver_id):
             await self.channel_layer.group_send(
@@ -194,6 +201,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         for msg in queued_messages:
             action, message = msg
             sent = False
+            is_status = (action == "status-change")
 
             if action == "new-message":
                 sent = await self.send_message(user_id, message, action, True)
@@ -219,9 +227,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def delete_message(self, msg_id, rec_id):
+        if not msg_id:
+            return
         try:
-            msg = Message.objects.get(msg_id=msg_id, receiver_id=rec_id)
-            msg.delete()
+            Message.objects.filter(msg_id=msg_id, receiver_id=rec_id).delete()
         except Exception as err:
             logger.error(f"Failed to delete message {msg_id}: {err}")
 

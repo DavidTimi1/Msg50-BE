@@ -29,8 +29,8 @@ SECRET_KEY = os.environ.get('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "True") == "True"
-HOST_NAME = "localhost" if DEBUG else ( os.environ.get("RENDER_EXTERNAL_HOSTNAME") or os.environ.get("HOST_NAME") )
-FRONTEND_URL = "http://localhost:3000" if DEBUG else os.environ.get("FRONTEND_URL")
+HOST_NAME = os.environ.get("HOST_NAME") or ("localhost" if DEBUG else os.environ.get("RENDER_EXTERNAL_HOSTNAME"))
+FRONTEND_URL = os.environ.get("FRONTEND_URL") or ("http://localhost:3000" if DEBUG else None)
 
 ALLOWED_HOSTS = [HOST_NAME]
 
@@ -108,18 +108,24 @@ ASGI_APPLICATION = "e2ee_chatapp.asgi.application"
 
 REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
 REDIS_PORT = os.environ.get("REDIS_PORT", 6379)
+REDIS_PASSWORD = os.environ.get("REDIS_PASSWORD", "")
+
+# Redis connection URL for application use (presence, cache, etc.)
+if REDIS_PASSWORD:
+    _REDIS_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/0"
+else:
+    _REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
+# Force RESP2 protocol to avoid HELLO auth errors with redis-py 5.x
+REDIS_URL = f"{_REDIS_URL}?protocol=2" if "?" not in _REDIS_URL else f"{_REDIS_URL}&protocol=2"
 
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [(REDIS_HOST, REDIS_PORT)],
+            "hosts": [REDIS_URL],
         },
     },
 }
-
-# Redis connection URL for application use (presence, cache, etc.)
-REDIS_URL = os.environ.get("REDIS_URL", f"redis://{REDIS_HOST}:{REDIS_PORT}/0")
 
 
 # Database
