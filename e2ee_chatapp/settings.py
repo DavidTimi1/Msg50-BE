@@ -111,10 +111,12 @@ REDIS_PORT = os.environ.get("REDIS_PORT", 6379)
 REDIS_PASSWORD = os.environ.get("REDIS_PASSWORD", "")
 
 # Redis connection URL for application use (presence, cache, etc.)
-if REDIS_PASSWORD:
-    _REDIS_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/0"
-else:
-    _REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
+_REDIS_URL = os.environ.get("REDIS_URL")
+if not _REDIS_URL:
+    if REDIS_PASSWORD:
+        _REDIS_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/0"
+    else:
+        _REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
 # Force RESP2 protocol to avoid HELLO auth errors with redis-py 5.x
 REDIS_URL = f"{_REDIS_URL}?protocol=2" if "?" not in _REDIS_URL else f"{_REDIS_URL}&protocol=2"
 
@@ -122,7 +124,12 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [REDIS_URL],
+            "hosts": [{
+                "address": REDIS_URL,
+                "socket_timeout": 30,
+                "socket_connect_timeout": 30,
+                "health_check_interval": 30,
+            }],
         },
     },
 }

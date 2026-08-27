@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **WebSocket Message Delivery**:
   - Heartbeat `ping` frames now extend the Redis `user_online` key's TTL dynamically. This fixes a major bug where users online for more than 60 seconds would "expire" in Redis, causing new messages to be stored in the DB instead of being pushed in real-time.
   - Added direct-to-socket delivery when the recipient matches the active socket connection, ensuring offline queue flushes bypass Redis/group_send layers and are fully dispatched before DB deletion.
+  - Configured custom connection timeouts (`socket_timeout: 30`, `socket_connect_timeout: 30`, `health_check_interval: 30`) in `CHANNEL_LAYERS` to resolve socket read timeout crashes under long-blocking Redis commands in production (e.g. Railway).
 
 ## [2.2.0] - 2026-08-25
 
